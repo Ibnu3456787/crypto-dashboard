@@ -1,0 +1,5 @@
+# No external requirements, just Python built-in modules
+flask
+requests
+matplotlib
+pandas
