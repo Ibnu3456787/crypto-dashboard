@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Crypto Dashboard Pro</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background: #111; color: #eee; text-align: center; }
+    h1 { color: #00ffcc; }
+    #search { margin: 20px; padding: 10px; width: 300px; font-size: 16px; }
+    table { margin: auto; border-collapse: collapse; width: 95%; }
+    th, td { padding: 10px; border-bottom: 1px solid #333; cursor: pointer; vertical-align: middle; }
+    th { background: #222; color: #0ff; }
+    tr:hover { background: #222; }
+    canvas { width: 120px !important; height: 40px !important; }
+  </style>
+</head>
+<body>
+  <h1>🌍 Crypto Dashboard – Top 100</h1>
+
+  <input type="text" id="search" placeholder="🔍 Search coin...">
+
+  <table id="crypto-table">
+    <thead>
+      <tr>
+        <th onclick="sortTable(0)">#</th>
+        <th onclick="sortTable(1)">Coin</th>
+        <th onclick="sortTable(2)">Price (USD)</th>
+        <th onclick="sortTable(3)">24h Change</th>
+        <th onclick="sortTable(4)">Market Cap</th>
+        <th>7d Chart</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    let coins = [];
+
+    async function loadData() {
+      const res = await fetch("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=true");
+      coins = await res.json();
+      renderTable(coins);
+    }
+
+    function renderTable(data) {
+      const tbody = document.querySelector("#crypto-table tbody");
+      tbody.innerHTML = "";
+      data.forEach((coin, index) => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${index + 1}</td>
+          <td><img src="${coin.image}" width="20"> ${coin.name} (${coin.symbol.toUpperCase()})</td>
+          <td>$${coin.current_price.toLocaleString()}</td>
+          <td style="color:${coin.price_change_percentage_24h >= 0 ? 'lime' : 'red'};">
+            ${coin.price_change_percentage_24h.toFixed(2)}%
+          </td>
+          <td>$${coin.market_cap.toLocaleString()}</td>
+          <td><canvas id="chart-${coin.id}"></canvas></td>
+        `;
+        tbody.appendChild(row);
+
+        // 🔥 Sparkline Chart
+        const ctx = document.getElementById(`chart-${coin.id}`).getContext("2d");
+        new Chart(ctx, {
+          type: "line",
+          data: {
+            labels: coin.sparkline_in_7d.price.map((_, i) => i),
+            datasets: [{
+              data: coin.sparkline_in_7d.price,
+              borderColor: coin.price_change_percentage_7d_in_currency >= 0 ? "lime" : "red",
+              borderWidth: 1,
+              pointRadius: 0,
+              fill: false,
+              tension: 0.2
+            }]
+          },
+          options: {
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { display: false },
+              y: { display: false }
+            },
+            responsive: true,
+            maintainAspectRatio: false
+          }
+        });
+      });
+    }
+
+    // 🔍 Search Function
+    document.getElementById("search").addEventListener("input", (e) => {
+      const value = e.target.value.toLowerCase();
+      const filtered = coins.filter(coin =>
+        coin.name.toLowerCase().includes(value) ||
+        coin.symbol.toLowerCase().includes(value)
+      );
+      renderTable(filtered);
+    });
+
+    // 📊 Sorting Function
+    function sortTable(n) {
+      const table = document.getElementById("crypto-table");
+      let rows = Array.from(table.rows).slice(1); // skip header
+      let sorted = rows.sort((a, b) => {
+        let A = a.cells[n].innerText.replace(/[^0-9.-]+/g,"");
+        let B = b.cells[n].innerText.replace(/[^0-9.-]+/g,"");
+        if (n === 1) { // Coin name
+          A = a.cells[n].innerText.toLowerCase();
+          B = b.cells[n].innerText.toLowerCase();
+          return A.localeCompare(B);
+        }
+        return parseFloat(A) - parseFloat(B);
+      });
+      table.tBodies[0].append(...sorted);
+    }
+
+    loadData();
+    setInterval(loadData, 60000); // refresh tiap 1 menit
+  </script>
+</body>
+</html>
